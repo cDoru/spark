@@ -19,31 +19,26 @@
 		function ViewModel() {
 			var self = this;
 			
-			self.PageNumber = ko.observable(0);
-			self.Videos = ko.observableArray([]);
+			self.Title = ko.observable('');
+			self.URL = ko.observable('');
 			
-			self.LoadVideos = function () {
-				var video = Parse.Object.extend("Video");
-				var query = new Parse.Query(video);
-				query.skip(20 * self.PageNumber());
-				query.limit(20);
-				query.find({
-					success: function(results) {
-						self.Videos(_.map(results, function(video) {
-							return {
-								Title: video.get('Title'),
-								URL: video.get('URL'),
-								Created: video.createdAt
-							};
-						}));
+			self.Suggest = function() {
+				var Suggestion = Parse.Object.extend("Suggestion");
+				
+				var suggestion = new Suggestion();
+				
+				suggestion.set("Title", self.Title());
+				suggestion.set("URL", self.URL());
+				
+				suggestion.save(null, {
+					success: function(gameScore) {
+						window.location = 'index.html';
 					},
-					error: function(error) {
-						alert("Error: " + error.message);
+					error: function(gameScore, error) {
+						window.alert('Error: ' + error.message);
 					}
 				});
 			};
-			
-			self.LoadVideos();
 		}
 	
 		$(function() {
@@ -72,13 +67,27 @@
     </div>
 
     <div class="container">
-      <h1>New Videos</h1>
+      <h1>Submit Suggestion</h1>
 	  
-	  <p>Don't see a video you like? <a href="submit.html">Submit it</a> now.</p>
-      
-	  <ul data-bind="foreach: Videos">
-		<li><a data-bind="attr: { 'href': URL }, text: Title"></a></li>
-	  </ul>
+	  <form class="form-horizontal">
+        <div class="control-group">
+          <label class="control-label" for="title">Title</label>
+          <div class="controls">
+  	        <input type="text" id="title" placeholder="A short video title" data-bind="value: Title">
+          </div>
+        </div>
+        <div class="control-group">
+          <label class="control-label" for="url">Link</label>
+  	        <div class="controls">
+  	        <input type="text" id="url" placeholder="The web address of the video" data-bind="value: URL">
+  	      </div>
+        </div>
+        <div class="control-group">
+  	      <div class="controls">
+  	        <button type="submit" class="btn" data-bind="click: Suggest">Suggest</button>
+  	      </div>
+        </div>
+      </form>
     </div>
 </body>
 </html>

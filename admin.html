@@ -20,20 +20,21 @@
 			var self = this;
 			
 			self.PageNumber = ko.observable(0);
-			self.Videos = ko.observableArray([]);
+			self.Suggestions = ko.observableArray([]);
 			
-			self.LoadVideos = function () {
-				var video = Parse.Object.extend("Video");
-				var query = new Parse.Query(video);
+			self.LoadSuggestions = function () {
+				var suggestion = Parse.Object.extend("Suggestion");
+				var query = new Parse.Query(suggestion);
 				query.skip(20 * self.PageNumber());
 				query.limit(20);
 				query.find({
 					success: function(results) {
-						self.Videos(_.map(results, function(video) {
+						self.Suggestions(_.map(results, function(suggestion) {
 							return {
-								Title: video.get('Title'),
-								URL: video.get('URL'),
-								Created: video.createdAt
+								parseObject: suggestion,
+								Title: suggestion.get('Title'),
+								URL: suggestion.get('URL'),
+								Created: suggestion.createdAt
 							};
 						}));
 					},
@@ -43,11 +44,46 @@
 				});
 			};
 			
-			self.LoadVideos();
+			self.Approve = function(o) {
+				var Video = Parse.Object.extend("Video");
+				
+				var video = new Video();
+				
+				video.set("Title", o.Title);
+				video.set("URL", o.URL);
+				
+				video.save(null, {
+					success: function(gameScore) {
+						self.DeleteAndReloadSuggestions(o.parseObject);
+					},
+					error: function(gameScore, error) {
+						window.alert('Error: ' + error.message);
+					}
+				});
+			};
+			
+			self.Reject = function(o) {
+				self.DeleteAndReloadSuggestions(o.parseObject);
+			};
+			
+			self.DeleteAndReloadSuggestions = function(parseObject) {
+				parseObject.destroy({
+					success: function() {
+						self.LoadSuggestions();
+					},
+					error: function(error) {
+						alert("Error: " + error.message);
+					}
+				});
+			};
+			
+			self.LoadSuggestions();
 		}
 	
 		$(function() {
 			Parse.initialize("nki3cdTqmIo6t4M5mR9eu4AYUCQubb6HYqunH4tL", "dvTEUTs3wO5R4fU7IYInJzuGrlG5eF4fBIuxIsOt");
+			
+			// TODO: check roles
 			
 			if (!Parse.User.current()) {
 				window.location = 'login.html';
@@ -72,12 +108,16 @@
     </div>
 
     <div class="container">
-      <h1>New Videos</h1>
+      <h1>Admin</h1>
 	  
-	  <p>Don't see a video you like? <a href="submit.html">Submit it</a> now.</p>
+	  <h2>Video Suggestions</h2>
       
-	  <ul data-bind="foreach: Videos">
-		<li><a data-bind="attr: { 'href': URL }, text: Title"></a></li>
+	  <ul data-bind="foreach: Suggestions">
+		<li>
+			<a data-bind="attr: { 'href': URL }, text: Title"></a> - 
+			<a href="#" data-bind="click: $root.Approve">Approve</a> / 
+			<a href="#" data-bind="click: $root.Reject">Reject</a>
+		</li>
 	  </ul>
     </div>
 </body>
