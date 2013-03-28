@@ -1,0 +1,89 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+    <title>Spark Video Website</title>
+	
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Our Spark video project">
+    <meta name="author" content="Phil, Tony, Joan, Carlos">
+
+    <link href="bootstrap/css/bootstrap.css" rel="stylesheet">
+	<link href="bootstrap/css/bootstrap-responsive.css" rel="stylesheet">
+	
+	<script src="http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script> 
+	<script src="http://www.parsecdn.com/js/parse-1.2.2.min.js"></script>
+	<script src="knockout/knockout-2.2.1.js"></script>
+	
+	<script language="javascript">
+		function ViewModel() {
+			var self = this;
+			
+			self.Username = ko.observable('');
+			self.Password1 = ko.observable('');
+			self.Password2 = ko.observable('');
+			
+			self.Register = function() {
+				if (self.Password1() !== self.Password2()) {
+					alert("Passwords do not match");
+				} else {
+					Parse.User.signUp(self.Username(), self.Password1(), { ACL: new Parse.ACL() }, {
+						success: function(user) {
+							window.location = 'index.html';
+						},
+						error: function(user, error) {
+							window.alert("Unable to create an account: " + error.message);
+						}
+					});
+				}
+			};			
+		}
+	
+		$(function() {
+			Parse.initialize("nki3cdTqmIo6t4M5mR9eu4AYUCQubb6HYqunH4tL", "dvTEUTs3wO5R4fU7IYInJzuGrlG5eF4fBIuxIsOt");
+			ko.applyBindings(new ViewModel());
+		});
+	</script>
+</head>
+<body>
+	<div class="navbar">
+      <div class="navbar-inner">
+        <div class="container">
+          <a class="brand" href="#">Spark Video Project</a>
+            <ul class="nav">
+              <li><a href="index.html">Home</a></li>
+            </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="container">
+      <h1>Register</h1>
+      
+  	  <form class="form-horizontal">
+        <div class="control-group">
+          <label class="control-label" for="username">Username</label>
+          <div class="controls">
+  	        <input type="text" id="username" placeholder="Username" data-bind="value: Username">
+          </div>
+        </div>
+        <div class="control-group">
+          <label class="control-label" for="password">Password</label>
+  	        <div class="controls">
+  	        <input type="password" id="password" placeholder="Password" data-bind="value: Password1">
+  	      </div>
+        </div>
+        <div class="control-group">
+          <label class="control-label" for="password">Confirm Password</label>
+  	        <div class="controls">
+  	        <input type="password" id="password" placeholder="Confirm Password" data-bind="value: Password2">
+  	      </div>
+        </div>
+        <div class="control-group">
+  	      <div class="controls">
+  	        <button type="submit" class="btn" data-bind="click: Register">Register</button>
+  	      </div>
+        </div>
+      </form>
+    </div>
+</body>
+</html>
