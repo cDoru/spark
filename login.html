@@ -12,48 +12,30 @@
 	
 	<script src="http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script> 
 	<script src="http://www.parsecdn.com/js/parse-1.2.2.min.js"></script>
-	<script src="underscore/underscore-min.js"></script>
 	<script src="knockout/knockout-2.2.1.js"></script>
 	
 	<script language="javascript">
 		function ViewModel() {
 			var self = this;
 			
-			self.PageNumber = ko.observable(0);
-			self.Videos = ko.observableArray([]);
+			self.Username = ko.observable('');
+			self.Password = ko.observable('');
 			
-			self.LoadVideos = function () {
-				var video = Parse.Object.extend("Video");
-				var query = new Parse.Query(video);
-				query.skip(20 * self.PageNumber());
-				query.limit(20);
-				query.find({
-					success: function(results) {
-						self.Videos(_.map(results, function(video) {
-							return {
-								Title: video.get('Title'),
-								URL: video.get('URL'),
-								Created: video.createdAt
-							};
-						}));
+			self.Login = function() {
+				Parse.User.logIn(self.Username(), self.Password(), {
+					success: function(user) {
+						window.location = 'index.html';
 					},
-					error: function(error) {
-						alert("Error: " + error.message);
+					error: function(user, error) {
+						window.alert("Invalid username or password. Please try again.");
 					}
 				});
 			};
-			
-			self.LoadVideos();
 		}
 	
 		$(function() {
 			Parse.initialize("nki3cdTqmIo6t4M5mR9eu4AYUCQubb6HYqunH4tL", "dvTEUTs3wO5R4fU7IYInJzuGrlG5eF4fBIuxIsOt");
-			
-			if (!Parse.User.current()) {
-				window.location = 'login.html';
-			} else {
-				ko.applyBindings(new ViewModel());
-			}
+			ko.applyBindings(new ViewModel());
 		});
 	</script>
 </head>
@@ -64,21 +46,35 @@
           <a class="brand" href="#">Spark Video Project</a>
             <ul class="nav">
               <li><a href="index.html">Home</a></li>
-              <li><a href="submit.html">Submit Video</a></li>
-              <li><a href="logout.html">Log Out</a></li>
             </ul>
         </div>
       </div>
     </div>
 
     <div class="container">
-      <h1>New Videos</h1>
-	  
-	  <p>Don't see a video you like? <a href="submit.html">Submit it</a> now.</p>
+      <h1>Login</h1>
       
-	  <ul data-bind="foreach: Videos">
-		<li><a data-bind="attr: { 'href': URL }, text: Title"></a></li>
-	  </ul>
+  	  <form class="form-horizontal">
+        <div class="control-group">
+          <label class="control-label" for="username">Username</label>
+          <div class="controls">
+  	        <input type="text" id="username" placeholder="Username" data-bind="value: Username">
+          </div>
+        </div>
+        <div class="control-group">
+          <label class="control-label" for="password">Password</label>
+  	        <div class="controls">
+  	        <input type="password" id="password" placeholder="Password" data-bind="value: Password">
+  	      </div>
+        </div>
+        <div class="control-group">
+  	      <div class="controls">
+  	        <button type="submit" class="btn" data-bind="click: Login">Login</button>
+  	      </div>
+        </div>
+      </form>
+	  
+	  <p>Don't have an account? <a href="register.html">Sign up</a></p>
     </div>
 </body>
 </html>
