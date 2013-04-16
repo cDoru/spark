@@ -46,7 +46,8 @@
 								parseObject: suggestion,
 								Title: suggestion.get('Title'),
 								URL: suggestion.get('URL'),
-								Created: suggestion.createdAt
+								Created: suggestion.createdAt,
+								Thumbnail: ''
 							};
 							
 							self.DownloadThumbnail(videoObject);
@@ -107,6 +108,9 @@
                 Parse.User.logIn(self.Username(), self.Password(), {
                     success: function (user) {
                         self.LoggedIn(true);
+						if (user.getUsername() == 'admin'){
+							self.LoadSuggestions();
+						}
                     },
                     error: function (user, error) {
                         window.alert("Invalid username or password. Please try again.");
@@ -140,7 +144,8 @@
                             var videoObject = {
                                 Title: video.get('Title'),
                                 URL: video.get('URL'),
-                                Created: video.createdAt
+                                Created: video.createdAt,
+								Thumbnail: ''
                             };
 							
 							self.DownloadThumbnail(videoObject);
@@ -158,6 +163,8 @@
 				var url = videoObject.URL;
 				var indexOfVideoID = url.indexOf('v=');
 				
+				videoObject.Thumbnail = '';
+				
 				if (indexOfVideoID > -1) {
 					var videoID = url.substring(indexOfVideoID + 2, url.length);
 					var dataUrl = 'https://gdata.youtube.com/feeds/api/videos/' + videoID;
@@ -173,13 +180,15 @@
 
             self.CheckCookie = function () {
                 self.LoggedIn(Parse.User.current() != null);
+				
+				if (self.LoggedIn() && Parse.User.current().getUsername() == 'admin') {
+					self.LoadSuggestions();
+				}
             };
 
             self.LoadVideos();
 
             self.CheckCookie();
-			
-			self.LoadSuggestions();
         }
 
         function RegisterViewModel() {
@@ -269,10 +278,14 @@
             <div class="row-fluid">
                 <div class="span12">
                     <h2>Tags</h2>
+					
+					<p>TODO</p>
 
                     <ul data-bind="foreach: Tags">
                         <li><a data-bind="click: ShowTagCommand, text: Title"></a></li>
                     </ul>
+					
+					<!-- ko if: LoggedIn() && _.any(Suggestions()) -->
 					
                     <h2>Suggested Videos</h2>
 					
@@ -294,6 +307,8 @@
                     </div>
 					
 					<div><a href="#" class="btn" data-bind="click: LoadMoreSuggestionsCommand">More</a></div>
+					
+					<!-- /ko -->
 					
 					<h2>Videos</h2>
 					
