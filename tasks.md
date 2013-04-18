@@ -1,10 +1,7 @@
 Task List
 =========
 
-- Phil / Tony
-  - Bootstrap
-  - Setup Parse 
-- Joan
-  - Design Front Page
-- Carlos
-  - Desing Admin Page
+- Search
+- Tags
+- Show more data for each video
+- Read video title from XML

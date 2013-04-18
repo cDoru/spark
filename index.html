@@ -2,39 +2,57 @@
 <html>
 <head>
     <title>Spark Video Website</title>
-	
+
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="Our Spark video project">
     <meta name="author" content="Phil, Tony, Joan, Carlos">
 
     <link href="bootstrap/css/bootstrap.css" rel="stylesheet">
-	<link href="bootstrap/css/bootstrap-responsive.css" rel="stylesheet">
-	
-	<script src="http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script> 
-	<script src="http://www.parsecdn.com/js/parse-1.2.2.min.js"></script>
-	<script src="underscore/underscore-min.js"></script>
-	<script src="knockout/knockout-2.2.1.js"></script>
-	
-	<script language="javascript">
-		function ViewModel() {
-			var self = this;
+    <link href="bootstrap/css/bootstrap-responsive.css" rel="stylesheet">
+
+    <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
+    <script src="http://www.parsecdn.com/js/parse-1.2.2.min.js"></script>
+    <script src="bootstrap/js/bootstrap.min.js"></script>
+    <script src="underscore/underscore-min.js"></script>
+    <script src="knockout/knockout-2.2.1.js"></script>
+
+    <script type="text/javascript">
+        function ViewModel() {
+            var self = this;
+
+            self.PageNumber = ko.observable(0);
+            self.Videos = ko.observableArray([]);
+
+            self.LoggedIn = ko.observable(false);
+            self.Username = ko.observable('');
+            self.Password = ko.observable('');
+
+            self.SearchText = ko.observable('');
+
+            self.Tags = ko.observableArray([]);
 			
-			self.PageNumber = ko.observable(0);
-			self.Videos = ko.observableArray([]);
+			self.SuggestionsPageNumber = ko.observable(0);
+			self.Suggestions = ko.observableArray([]);
 			
-			self.LoadVideos = function () {
-				var video = Parse.Object.extend("Video");
-				var query = new Parse.Query(video);
-				query.skip(20 * self.PageNumber());
+			self.LoadSuggestions = function () {
+				var suggestion = Parse.Object.extend("Suggestion");
+				var query = new Parse.Query(suggestion);
+				query.skip(20 * self.SuggestionsPageNumber());
 				query.limit(20);
 				query.find({
 					success: function(results) {
-						self.Videos(_.map(results, function(video) {
-							return {
-								Title: video.get('Title'),
-								URL: video.get('URL'),
-								Created: video.createdAt
+						self.Suggestions(_.map(results, function(suggestion) {
+							var videoObject = {
+								parseObject: suggestion,
+								Title: suggestion.get('Title'),
+								URL: suggestion.get('URL'),
+								Created: suggestion.createdAt,
+								Thumbnail: ''
 							};
+							
+							self.DownloadThumbnail(videoObject);
+							
+							return videoObject;
 						}));
 					},
 					error: function(error) {
@@ -43,42 +61,332 @@
 				});
 			};
 			
-			self.LoadVideos();
-		}
-	
-		$(function() {
-			Parse.initialize("nki3cdTqmIo6t4M5mR9eu4AYUCQubb6HYqunH4tL", "dvTEUTs3wO5R4fU7IYInJzuGrlG5eF4fBIuxIsOt");
+			self.LoadMoreSuggestionsCommand = function() {
+				self.SuggestionsPageNumber(self.PageNumber() + 1);
+				self.LoadSuggestions();
+			};
 			
-			if (!Parse.User.current()) {
-				window.location = 'login.html';
-			} else {
-				ko.applyBindings(new ViewModel());
-			}
-		});
-	</script>
+			self.LoadMoreVideosCommand = function() {
+				self.PageNumber(self.PageNumber() + 1);
+				self.LoadVideos();
+			};
+			
+			self.Approve = function(o) {
+				var Video = Parse.Object.extend("Video");
+				
+				var video = new Video();
+				
+				video.set("Title", o.Title);
+				video.set("URL", o.URL);
+				
+				video.save(null, {
+					success: function(gameScore) {
+						self.DeleteAndReloadSuggestions(o.parseObject);
+					},
+					error: function(gameScore, error) {
+						window.alert('Error: ' + error.message);
+					}
+				});
+			};
+			
+			self.Reject = function(o) {
+				self.DeleteAndReloadSuggestions(o.parseObject);
+			};
+			
+			self.DeleteAndReloadSuggestions = function(parseObject) {
+				parseObject.destroy({
+					success: function() {
+						self.LoadSuggestions();
+					},
+					error: function(error) {
+						alert("Error: " + error.message);
+					}
+				});
+			};
+
+            self.Login = function () {
+                Parse.User.logIn(self.Username(), self.Password(), {
+                    success: function (user) {
+                        self.LoggedIn(true);
+						if (user.getUsername() == 'admin'){
+							self.LoadSuggestions();
+						}
+                    },
+                    error: function (user, error) {
+                        window.alert("Invalid username or password. Please try again.");
+                    }
+                });
+            };
+
+            self.LogoutCommand = function () {
+                if (Parse.User.current()) {
+                    Parse.User.logOut();
+                    self.LoggedIn(false);
+                }
+            };
+
+            self.SearchCommand = function () {
+                // todo
+            };
+
+            self.ShowTagCommand = function () {
+                // todo
+            };
+
+            self.LoadVideos = function () {
+                var video = Parse.Object.extend("Video");
+                var query = new Parse.Query(video);
+                query.skip(20 * self.PageNumber());
+                query.limit(20);
+                query.find({
+                    success: function (results) {
+                        self.Videos(_.map(results, function (video) {
+                            var videoObject = {
+                                Title: video.get('Title'),
+                                URL: video.get('URL'),
+                                Created: video.createdAt,
+								Thumbnail: ''
+                            };
+							
+							self.DownloadThumbnail(videoObject);
+							
+							return videoObject;
+                        }));
+                    },
+                    error: function (error) {
+                        alert("Error: " + error.message);
+                    }
+                });
+            };
+			
+			self.DownloadThumbnail = function(videoObject) {
+				var url = videoObject.URL;
+				var indexOfVideoID = url.indexOf('v=');
+				
+				videoObject.Thumbnail = '';
+				
+				if (indexOfVideoID > -1) {
+					var videoID = url.substring(indexOfVideoID + 2, url.length);
+					var dataUrl = 'https://gdata.youtube.com/feeds/api/videos/' + videoID;
+					
+					$.ajax({
+						url: dataUrl,
+						async: false
+					}).done(function(xml) {
+						videoObject.Thumbnail = $(xml).children('entry').children('media\\:group').children('media\\:thumbnail').attr('url');
+					});
+				}
+			};
+
+            self.CheckCookie = function () {
+                self.LoggedIn(Parse.User.current() != null);
+				
+				if (self.LoggedIn() && Parse.User.current().getUsername() == 'admin') {
+					self.LoadSuggestions();
+				}
+            };
+
+            self.LoadVideos();
+
+            self.CheckCookie();
+        }
+
+        function RegisterViewModel() {
+            var self = this;
+
+            self.Username = ko.observable('');
+            self.Password1 = ko.observable('');
+            self.Password2 = ko.observable('');
+
+            self.Register = function () {
+                if (self.Password1() !== self.Password2()) {
+                    alert("Passwords do not match");
+                } else {
+                    Parse.User.signUp(self.Username(), self.Password1(), { ACL: new Parse.ACL() }, {
+                        success: function (user) {
+                            window.location = 'index.html';
+                        },
+                        error: function (user, error) {
+                            window.alert("Unable to create an account: " + error.message);
+                        }
+                    });
+                }
+            };
+        }
+		
+		function SubmitViewModel() {
+			var self = this;
+			
+			self.Title = ko.observable('');
+			self.URL = ko.observable('');
+			
+			self.SubmitCommand = function() {
+				var Suggestion = Parse.Object.extend("Suggestion");
+				
+				var suggestion = new Suggestion();
+				
+				suggestion.set("Title", self.Title());
+				suggestion.set("URL", self.URL());
+				
+				suggestion.save(null, {
+					success: function(gameScore) {
+						window.location = 'index.html';
+					},
+					error: function(gameScore, error) {
+						window.alert('Error: ' + error.message);
+					}
+				});
+			};
+		}
+
+        $(function () {
+            Parse.initialize("nki3cdTqmIo6t4M5mR9eu4AYUCQubb6HYqunH4tL", "dvTEUTs3wO5R4fU7IYInJzuGrlG5eF4fBIuxIsOt");
+
+            ko.applyBindings(new ViewModel(), $('#main')[0]);
+            ko.applyBindings(new RegisterViewModel(), $('#registerModal')[0]);
+			ko.applyBindings(new SubmitViewModel(), $('#submitModal')[0]);
+        });
+    </script>
 </head>
 <body>
-	<div class="navbar">
-      <div class="navbar-inner">
-        <div class="container">
-          <a class="brand" href="#">Spark Video Project</a>
-            <ul class="nav">
-              <li><a href="index.html">Home</a></li>
-              <li><a href="submit.html">Submit Video</a></li>
-              <li><a href="logout.html">Log Out</a></li>
-            </ul>
+    <div id="main">
+      <div class="container">
+        <div class="navbar">
+            <div class="navbar-inner">
+                    <a class="brand" href="#">Spark Video Project</a>
+                    <ul class="nav">
+                        <li><a href="index.html">Home</a></li>
+						<li><a href="#submitModal" data-bind="visible: LoggedIn" role="button" data-toggle="modal">Submit Video</a></li>
+                        <li><a href="#registerModal" data-bind="visible: !LoggedIn()" role="button" data-toggle="modal">Register</a></li>
+						<li><a href="#" data-bind="click: LogoutCommand, visible: LoggedIn">Log Out</a></li>
+                    </ul>
+                    <form class="navbar-form pull-right" data-bind="visible: !LoggedIn()">
+                        <input type="text" class="span2" id="username" placeholder="Username" data-bind="value: Username" />
+                        <input type="password" class="span2" id="password" placeholder="Password" data-bind="value: Password" />
+                        <button type="submit" class="btn" data-bind="click: Login">Login</button>
+                    </form>
+                </div>
+            </div> 
+			
+			<form class="form-search pull-right">
+                <div class="input-append">
+                    <input type="text" placeholder="Search" data-bind="value: SearchText" class="input-medium search-query">
+                    <button type="submit" data-bind="click: SearchCommand" class="btn">Go</button>
+                </div>
+            </form>
+					
+            <div class="row-fluid">
+                <div class="span12">
+                    <h2>Tags</h2>
+					
+					<p>TODO</p>
+
+                    <ul data-bind="foreach: Tags">
+                        <li><a data-bind="click: ShowTagCommand, text: Title"></a></li>
+                    </ul>
+					
+					<!-- ko if: LoggedIn() && _.any(Suggestions()) -->
+					
+                    <h2>Suggested Videos</h2>
+					
+                    <div data-bind="foreach: Suggestions">
+					  <div class="well">
+                       <div class="pull-left">
+					     <a data-bind="attr: { 'href': URL }" target="_blank">
+						   <img data-bind="attr: { 'src': Thumbnail }" class="img-polaroid" width="140" height="140" /></a>
+					   </div>
+					   <div style="margin-left: 10px;" class="pull-left">
+                       	 <h4><a data-bind="attr: { 'href': URL }, text: Title"></a></h4>
+                       	 <div>
+						   <a href="#" class="btn" data-bind="click: $root.Approve">Approve</a> 
+                       	   <a href="#" class="btn" data-bind="click: $root.Reject">Reject</a>
+						 </div>
+                       </div>
+					   <div class="clearfix"></div>
+					  </div>
+                    </div>
+					
+					<div><a href="#" class="btn" data-bind="click: LoadMoreSuggestionsCommand">More</a></div>
+					
+					<!-- /ko -->
+					
+					<h2>Videos</h2>
+					
+					<p data-bind="visible: LoggedIn">Don't see a video you like? <a href="#submitModal" role="button" data-toggle="modal">Suggest it</a> now.</p>
+					
+					<div data-bind="foreach: Videos">
+					  <div class="well">
+                         <div class="pull-left">
+					      <a  data-bind="attr: { 'href': URL }" target="_blank"> 
+						  <img data-bind="attr: { 'src': Thumbnail }" class="img-polaroid" width="140" height="140" /> </a>
+					     </div>
+					     <div style="margin-left: 10px;" class="pull-left">
+                         	 <h4><a data-bind="attr: { 'href': URL }, text: Title"></a></h4>
+                         </div>
+					     <div class="clearfix"></div>
+					   </div>
+                    </div>
+					
+					<div><a href="#" class="btn" data-bind="click: LoadMoreVideosCommand">More</a></div>
+                </div>
+            </div>
         </div>
-      </div>
     </div>
 
-    <div class="container">
-      <h1>New Videos</h1>
-	  
-	  <p>Don't see a video you like? <a href="submit.html">Submit it</a> now.</p>
-      
-	  <ul data-bind="foreach: Videos">
-		<li><a data-bind="attr: { 'href': URL }, text: Title"></a></li>
-	  </ul>
+    <div id="registerModal" class="modal hide fade">
+        <div class="modal-header">
+            <h3>Register</h3>
+        </div>
+        <div class="modal-body">
+            <form class="form-horizontal">
+                <div class="control-group">
+                    <label class="control-label" for="username">Username</label>
+                    <div class="controls">
+                        <input type="text" placeholder="Username" data-bind="value: Username" />
+                    </div>
+                </div>
+                <div class="control-group">
+                    <label class="control-label" for="password">Password</label>
+                    <div class="controls">
+                        <input type="password" placeholder="Password" data-bind="value: Password1" />
+                    </div>
+                </div>
+                <div class="control-group">
+                    <label class="control-label" for="password">Confirm Password</label>
+                    <div class="controls">
+                        <input type="password" placeholder="Confirm Password" data-bind="value: Password2" />
+                    </div>
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button type="submit" class="btn btn-primary" data-bind="click: Register">Register</button>
+        </div>
+    </div>
+
+    <div id="submitModal" class="modal hide fade">
+        <div class="modal-header">
+            <h3>Submit Video</h3>
+        </div>
+        <div class="modal-body">
+            <form class="form-horizontal">
+              <div class="control-group">
+                <label class="control-label" for="title">Title</label>
+                <div class="controls">
+  	              <input type="text" id="title" placeholder="A short video title" data-bind="value: Title">
+                </div>
+              </div>
+              <div class="control-group">
+                <label class="control-label" for="url">Link</label>
+  	              <div class="controls">
+  	              <input type="text" id="url" placeholder="The web address of the video" data-bind="value: URL">
+  	            </div>
+              </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button type="submit" class="btn btn-primary" data-bind="click: SubmitCommand">Submit</button>
+        </div>
     </div>
 </body>
 </html>
