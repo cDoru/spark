@@ -23,6 +23,13 @@
             self.PageNumber = ko.observable(0);
             self.Videos = ko.observableArray([]);
 
+            self.ErrorMessage = ko.observable();
+
+            self.ShowErrorMessage = function(error) {
+                self.ErrorMessage(error);
+                $('#errorModal').modal();
+            };
+
             self.LoggedIn = ko.observable(false);
             self.Username = ko.observable('');
             self.Password = ko.observable('');
@@ -44,19 +51,18 @@
 						self.Suggestions(_.map(results, function(suggestion) {
 							var videoObject = {
 								parseObject: suggestion,
-								Title: suggestion.get('Title'),
 								URL: suggestion.get('URL'),
 								Created: suggestion.createdAt,
 								Thumbnail: ''
 							};
 							
-							self.DownloadThumbnail(videoObject);
+							self.DownloadTitleAndThumbnail(videoObject);
 							
 							return videoObject;
 						}));
 					},
 					error: function(error) {
-						alert("Error: " + error.message);
+						self.ShowErrorMessage("Error: " + error.message);
 					}
 				});
 			};
@@ -75,8 +81,7 @@
 				var Video = Parse.Object.extend("Video");
 				
 				var video = new Video();
-				
-				video.set("Title", o.Title);
+
 				video.set("URL", o.URL);
 				
 				video.save(null, {
@@ -84,7 +89,7 @@
 						self.DeleteAndReloadSuggestions(o.parseObject);
 					},
 					error: function(gameScore, error) {
-						window.alert('Error: ' + error.message);
+						self.ShowErrorMessage('Error: ' + error.message);
 					}
 				});
 			};
@@ -99,7 +104,7 @@
 						self.LoadSuggestions();
 					},
 					error: function(error) {
-						alert("Error: " + error.message);
+						self.ShowErrorMessage("Error: " + error.message);
 					}
 				});
 			};
@@ -113,7 +118,7 @@
 						}
                     },
                     error: function (user, error) {
-                        window.alert("Invalid username or password. Please try again.");
+                        self.ShowErrorMessage("Invalid username or password. Please try again.");
                     }
                 });
             };
@@ -142,24 +147,23 @@
                     success: function (results) {
                         self.Videos(_.map(results, function (video) {
                             var videoObject = {
-                                Title: video.get('Title'),
                                 URL: video.get('URL'),
                                 Created: video.createdAt,
 								Thumbnail: ''
                             };
 							
-							self.DownloadThumbnail(videoObject);
+							self.DownloadTitleAndThumbnail(videoObject);
 							
 							return videoObject;
                         }));
                     },
                     error: function (error) {
-                        alert("Error: " + error.message);
+                        self.ShowErrorMessage("Error: " + error.message);
                     }
                 });
             };
 			
-			self.DownloadThumbnail = function(videoObject) {
+			self.DownloadTitleAndThumbnail = function(videoObject) {
 				var url = videoObject.URL;
 				var indexOfVideoID = url.indexOf('v=');
 				
@@ -173,6 +177,7 @@
 						url: dataUrl,
 						async: false
 					}).done(function(xml) {
+                        videoObject.Title = $(xml).children('entry').children('title').text();
 						videoObject.Thumbnail = $(xml).children('entry').children('media\\:group').children('media\\:thumbnail').attr('url');
 					});
 				}
@@ -191,7 +196,7 @@
             self.CheckCookie();
         }
 
-        function RegisterViewModel() {
+        function RegisterViewModel(outerSelf) {
             var self = this;
 
             self.Username = ko.observable('');
@@ -200,24 +205,23 @@
 
             self.Register = function () {
                 if (self.Password1() !== self.Password2()) {
-                    alert("Passwords do not match");
+                    outerSelf.ShowErrorMessage("Passwords do not match");
                 } else {
                     Parse.User.signUp(self.Username(), self.Password1(), { ACL: new Parse.ACL() }, {
                         success: function (user) {
                             window.location = 'index.html';
                         },
                         error: function (user, error) {
-                            window.alert("Unable to create an account: " + error.message);
+                            outerSelf.ShowErrorMessage("Unable to create an account: " + error.message);
                         }
                     });
                 }
             };
         }
 		
-		function SubmitViewModel() {
+		function SubmitViewModel(outerSelf) {
 			var self = this;
 			
-			self.Title = ko.observable('');
 			self.URL = ko.observable('');
 			
 			self.SubmitCommand = function() {
@@ -225,7 +229,6 @@
 				
 				var suggestion = new Suggestion();
 				
-				suggestion.set("Title", self.Title());
 				suggestion.set("URL", self.URL());
 				
 				suggestion.save(null, {
@@ -233,7 +236,7 @@
 						window.location = 'index.html';
 					},
 					error: function(gameScore, error) {
-						window.alert('Error: ' + error.message);
+						outerSelf.ShowErrorMessage('Error: ' + error.message);
 					}
 				});
 			};
@@ -242,15 +245,55 @@
         $(function () {
             Parse.initialize("nki3cdTqmIo6t4M5mR9eu4AYUCQubb6HYqunH4tL", "dvTEUTs3wO5R4fU7IYInJzuGrlG5eF4fBIuxIsOt");
 
-            ko.applyBindings(new ViewModel(), $('#main')[0]);
-            ko.applyBindings(new RegisterViewModel(), $('#registerModal')[0]);
-			ko.applyBindings(new SubmitViewModel(), $('#submitModal')[0]);
+            var vm = new ViewModel();
+
+            ko.applyBindings(vm, $('#main')[0]);
+            ko.applyBindings(vm, $('#errorModal')[0]);
+            ko.applyBindings(new RegisterViewModel(vm), $('#registerModal')[0]);
+			ko.applyBindings(new SubmitViewModel(vm), $('#submitModal')[0]);
         });
     </script>
+    <style>
+      body { background: url('images/white_carbonfiber.png'); }
+
+      h1, h2, h3 { color: #1080ff; }
+
+      a { color: #1080ff; }
+
+      a:hover { text-decoration: none; }
+
+.navbar-inner
+{
+    padding: 15px;
+    font-size: 115%;
+    background: #af1111; /* Old browsers */
+background: -moz-linear-gradient(top,  #af1111 1%, #660202 100%); /* FF3.6+ */
+background: -webkit-gradient(linear, left top, left bottom, color-stop(1%,#af1111), color-stop(100%,#660202)); /* Chrome,Safari4+ */
+background: -webkit-linear-gradient(top,  #af1111 1%,#660202 100%); /* Chrome10+,Safari5.1+ */
+background: -o-linear-gradient(top,  #af1111 1%,#660202 100%); /* Opera 11.10+ */
+background: -ms-linear-gradient(top,  #af1111 1%,#660202 100%); /* IE10+ */
+background: linear-gradient(to bottom,  #af1111 1%,#660202 100%); /* W3C */
+filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='#af1111', endColorstr='#660202',GradientType=0 ); /* IE6-9 */
+border: 0;
+    border-radius: 5px;
+    box-shadow: #000 0 0 10px;
+    color: #ffffff;
+}
+
+.navbar .brand
+{
+    font-size: 1.75em;
+}
+
+.navbar .brand, .navbar .nav > li > a
+{
+    color: #ffffff;
+}
+    </style>
 </head>
 <body>
     <div id="main">
-      <div class="container">
+      <div class="container" style="background: #fafafa; margin: 20px auto;padding: 20px; box-shadow: 0 0 20px #808080;">
         <div class="navbar">
             <div class="navbar-inner">
                     <a class="brand" href="#">Spark Video Project</a>
@@ -306,7 +349,7 @@
 					  </div>
                     </div>
 					
-					<div><a href="#" class="btn" data-bind="click: LoadMoreSuggestionsCommand">More</a></div>
+					<div><a href="#" class="btn btn-primary" data-bind="click: LoadMoreSuggestionsCommand">More</a></div>
 					
 					<!-- /ko -->
 					
@@ -315,19 +358,19 @@
 					<p data-bind="visible: LoggedIn">Don't see a video you like? <a href="#submitModal" role="button" data-toggle="modal">Suggest it</a> now.</p>
 					
 					<div data-bind="foreach: Videos">
-					  <div class="well">
-                         <div class="pull-left">
-					      <a  data-bind="attr: { 'href': URL }" target="_blank"> 
+					  <div class="well" style="background: #f0f0f0; border-radius: 5px; box-shadow:0 0 10px #808080;">
+                         <div class="pull-left" style="margin: 10px;">
+					      <a data-bind="attr: { 'href': URL }" target="_blank"> 
 						  <img data-bind="attr: { 'src': Thumbnail }" class="img-polaroid" width="140" height="140" /> </a>
 					     </div>
-					     <div style="margin-left: 10px;" class="pull-left">
-                         	 <h4><a data-bind="attr: { 'href': URL }, text: Title"></a></h4>
+					     <div>
+                         	 <h4 style="word-wrap: normal" ><a data-bind="attr: { 'href': URL }, text: Title"></a></h4>
                          </div>
 					     <div class="clearfix"></div>
 					   </div>
                     </div>
 					
-					<div><a href="#" class="btn" data-bind="click: LoadMoreVideosCommand">More</a></div>
+					<div><a href="#" class="btn btn-primary" data-bind="click: LoadMoreVideosCommand">More</a></div>
                 </div>
             </div>
         </div>
@@ -371,12 +414,6 @@
         <div class="modal-body">
             <form class="form-horizontal">
               <div class="control-group">
-                <label class="control-label" for="title">Title</label>
-                <div class="controls">
-  	              <input type="text" id="title" placeholder="A short video title" data-bind="value: Title">
-                </div>
-              </div>
-              <div class="control-group">
                 <label class="control-label" for="url">Link</label>
   	              <div class="controls">
   	              <input type="text" id="url" placeholder="The web address of the video" data-bind="value: URL">
@@ -386,6 +423,15 @@
         </div>
         <div class="modal-footer">
             <button type="submit" class="btn btn-primary" data-bind="click: SubmitCommand">Submit</button>
+        </div>
+    </div>
+
+    <div id="errorModal" class="modal hide fade">
+        <div class="modal-header">
+            <h3>Error</h3>
+        </div>
+        <div class="modal-body">
+            <div data-bind="text: ErrorMessage"></div>
         </div>
     </div>
 </body>
