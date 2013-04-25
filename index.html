@@ -124,15 +124,16 @@
 				var Tag = Parse.Object.extend("Tag");
 				
 				for (var i = 0; i < tags.length; i++) {
+					var thisTag = tags[i];
 					var query = new Parse.Query(Tag);
 					query.limit(1);
-					query.equalTo('Tag', tags[i]);
+					query.equalTo('Tag', thisTag);
 					query.count({
 						success: function(result) {
 							if (result == 0){
 								var tag = new Tag();
 		
-								tag.set("Tag", tags[i]);
+								tag.set("Tag", thisTag);
 								
 								tag.save(null, {
 									error: function(notUsed, error) {
