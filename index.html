@@ -11,12 +11,19 @@
     <link href="bootstrap/css/bootstrap-responsive.css" rel="stylesheet">
 
     <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
-    <script src="http://www.parsecdn.com/js/parse-1.2.2.min.js"></script>
+    <script src="parse/parse.min.js"></script>
     <script src="bootstrap/js/bootstrap.min.js"></script>
     <script src="underscore/underscore-min.js"></script>
     <script src="knockout/knockout-2.2.1.js"></script>
 
     <script type="text/javascript">
+		function Video() {
+			var self = this;
+			
+			self.Title = ko.observable('');
+			self.Thumbnail = ko.observable('');
+		}
+	
         function ViewModel() {
             var self = this;
 
@@ -46,15 +53,17 @@
 				var query = new Parse.Query(suggestion);
 				query.skip(20 * self.SuggestionsPageNumber());
 				query.limit(20);
+				query.descending('createdAt');
 				query.find({
 					success: function(results) {
 						self.Suggestions(_.map(results, function(suggestion) {
-							var videoObject = {
-								parseObject: suggestion,
-								URL: suggestion.get('URL'),
-								Created: suggestion.createdAt,
-								Thumbnail: ''
-							};
+							var videoObject = new Video();
+
+							videoObject.parseObject = suggestion;
+							videoObject.URL = suggestion.get('URL');
+							videoObject.Tags = suggestion.get('Tags');
+							videoObject.Created = suggestion.createdAt;
+							videoObject.Thumbnail('');
 							
 							self.DownloadTitleAndThumbnail(videoObject);
 							
@@ -67,14 +76,30 @@
 				});
 			};
 			
-			self.LoadMoreSuggestionsCommand = function() {
-				self.SuggestionsPageNumber(self.PageNumber() + 1);
+			self.LoadSuggestionsPageCommand = function(n) {
+				self.SuggestionsPageNumber(n);
 				self.LoadSuggestions();
 			};
 			
-			self.LoadMoreVideosCommand = function() {
-				self.PageNumber(self.PageNumber() + 1);
+			self.LoadPrevSuggestionsCommand = function() {
+				self.LoadSuggestionsPageCommand(self.SuggestionsPageNumber() - 1);
+			};
+			
+			self.LoadNextSuggestionsCommand = function() {
+				self.LoadSuggestionsPageCommand(self.SuggestionsPageNumber() + 1);
+			};
+			
+			self.LoadVideosPageCommand = function(n) {
+				self.PageNumber(n);
 				self.LoadVideos();
+			};
+			
+			self.LoadPrevVideosCommand = function() {
+				self.LoadVideosPageCommand(self.PageNumber() - 1);
+			};
+			
+			self.LoadNextVideosCommand = function() {
+				self.LoadVideosPageCommand(self.PageNumber() + 1);
 			};
 			
 			self.Approve = function(o) {
@@ -83,15 +108,44 @@
 				var video = new Video();
 
 				video.set("URL", o.URL);
+				video.set("Tags", o.Tags);
 				
 				video.save(null, {
-					success: function(gameScore) {
+					success: function(notUsed) {
 						self.DeleteAndReloadSuggestions(o.parseObject);
 					},
-					error: function(gameScore, error) {
+					error: function(notUsed, error) {
 						self.ShowErrorMessage('Error: ' + error.message);
 					}
 				});
+			
+				var tags = o.Tags.split(' ');
+				
+				var Tag = Parse.Object.extend("Tag");
+				
+				for (var i = 0; i < tags.length; i++) {
+					var query = new Parse.Query(Tag);
+					query.limit(1);
+					query.equalTo('Tag', tags[i]);
+					query.count({
+						success: function(result) {
+							if (result == 0){
+								var tag = new Tag();
+		
+								tag.set("Tag", tags[i]);
+								
+								tag.save(null, {
+									error: function(notUsed, error) {
+										self.ShowErrorMessage('Error: ' + error.message);
+									}
+								});
+							}
+						},
+						error: function(error) {
+							self.ShowErrorMessage("Error: " + error.message);
+						}
+					});
+				}
 			};
 			
 			self.Reject = function(o) {
@@ -131,11 +185,51 @@
             };
 
             self.SearchCommand = function () {
-                // todo
+				var video = Parse.Object.extend("Video");
+                var query = new Parse.Query(video);
+                query.limit(20);
+				query.contains('Tags', self.SearchText());
+				query.descending('createdAt');
+                query.find({
+                    success: function (results) {
+                        self.Videos(_.map(results, function (video) {
+                            var videoObject = new Video();
+							
+							videoObject.URL = video.get('URL');
+							videoObject.Tags = video.get('Tags');
+                            videoObject.Created = video.createdAt;
+							videoObject.Thumbnail('');
+							
+							self.DownloadTitleAndThumbnail(videoObject);
+							
+							return videoObject;
+                        }));
+                    },
+                    error: function (error) {
+                        self.ShowErrorMessage("Error: " + error.message);
+                    }
+                });
+            };
+
+            self.LoadTags = function () {
+				var tag = Parse.Object.extend("Tag");
+                var query = new Parse.Query(tag);
+				query.ascending('Tag');
+                query.find({
+                    success: function (results) {
+                        self.Tags(_.map(results, function (tag) {
+                            return { Tag: tag.get('Tag') };
+                        }));
+                    },
+                    error: function (error) {
+                        self.ShowErrorMessage("Error: " + error.message);
+                    }
+                });
             };
 
             self.ShowTagCommand = function () {
-                // todo
+                self.SearchText(this.Tag);
+				self.SearchCommand();
             };
 
             self.LoadVideos = function () {
@@ -143,14 +237,16 @@
                 var query = new Parse.Query(video);
                 query.skip(20 * self.PageNumber());
                 query.limit(20);
+				query.descending('createdAt');
                 query.find({
                     success: function (results) {
                         self.Videos(_.map(results, function (video) {
-                            var videoObject = {
-                                URL: video.get('URL'),
-                                Created: video.createdAt,
-								Thumbnail: ''
-                            };
+                            var videoObject = new Video();
+							
+							videoObject.URL = video.get('URL');
+							videoObject.Tags = video.get('Tags');
+                            videoObject.Created = video.createdAt;
+							videoObject.Thumbnail('');
 							
 							self.DownloadTitleAndThumbnail(videoObject);
 							
@@ -167,18 +263,15 @@
 				var url = videoObject.URL;
 				var indexOfVideoID = url.indexOf('v=');
 				
-				videoObject.Thumbnail = '';
-				
 				if (indexOfVideoID > -1) {
 					var videoID = url.substring(indexOfVideoID + 2, url.length);
-					var dataUrl = 'https://gdata.youtube.com/feeds/api/videos/' + videoID;
+					var dataUrl = 'http://gdata.youtube.com/feeds/api/videos/' + videoID;
 					
 					$.ajax({
-						url: dataUrl,
-						async: false
-					}).done(function(xml) {
-                        videoObject.Title = $(xml).children('entry').children('title').text();
-						videoObject.Thumbnail = $(xml).children('entry').children('media\\:group').children('media\\:thumbnail').attr('url');
+						url: dataUrl
+					}).always(function(xml) {
+						videoObject.Title($(xml).children('entry').children('title').text());
+						videoObject.Thumbnail($(xml).children('entry').children('media\\:group').children('media\\:thumbnail').attr('url'));
 					});
 				}
 			};
@@ -192,6 +285,8 @@
             };
 
             self.LoadVideos();
+			
+			self.LoadTags();
 
             self.CheckCookie();
         }
@@ -223,6 +318,7 @@
 			var self = this;
 			
 			self.URL = ko.observable('');
+			self.Tags = ko.observable('');
 			
 			self.SubmitCommand = function() {
 				var Suggestion = Parse.Object.extend("Suggestion");
@@ -230,12 +326,13 @@
 				var suggestion = new Suggestion();
 				
 				suggestion.set("URL", self.URL());
+				suggestion.set("Tags", self.Tags());
 				
 				suggestion.save(null, {
-					success: function(gameScore) {
+					success: function(notUsed) {
 						window.location = 'index.html';
 					},
-					error: function(gameScore, error) {
+					error: function(notUsed, error) {
 						outerSelf.ShowErrorMessage('Error: ' + error.message);
 					}
 				});
@@ -262,33 +359,33 @@
 
       a:hover { text-decoration: none; }
 
-.navbar-inner
-{
-    padding: 15px;
-    font-size: 115%;
-    background: #af1111; /* Old browsers */
-background: -moz-linear-gradient(top,  #af1111 1%, #660202 100%); /* FF3.6+ */
-background: -webkit-gradient(linear, left top, left bottom, color-stop(1%,#af1111), color-stop(100%,#660202)); /* Chrome,Safari4+ */
-background: -webkit-linear-gradient(top,  #af1111 1%,#660202 100%); /* Chrome10+,Safari5.1+ */
-background: -o-linear-gradient(top,  #af1111 1%,#660202 100%); /* Opera 11.10+ */
-background: -ms-linear-gradient(top,  #af1111 1%,#660202 100%); /* IE10+ */
-background: linear-gradient(to bottom,  #af1111 1%,#660202 100%); /* W3C */
-filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='#af1111', endColorstr='#660202',GradientType=0 ); /* IE6-9 */
-border: 0;
-    border-radius: 5px;
-    box-shadow: #000 0 0 10px;
-    color: #ffffff;
-}
-
-.navbar .brand
-{
-    font-size: 1.75em;
-}
-
-.navbar .brand, .navbar .nav > li > a
-{
-    color: #ffffff;
-}
+		.navbar-inner
+		{
+			padding: 15px;
+			font-size: 115%;
+			background: #af1111; /* Old browsers */
+			background: -moz-linear-gradient(top,  #af1111 1%, #660202 100%); /* FF3.6+ */
+			background: -webkit-gradient(linear, left top, left bottom, color-stop(1%,#af1111), color-stop(100%,#660202)); /* Chrome,Safari4+ */
+			background: -webkit-linear-gradient(top,  #af1111 1%,#660202 100%); /* Chrome10+,Safari5.1+ */
+			background: -o-linear-gradient(top,  #af1111 1%,#660202 100%); /* Opera 11.10+ */
+			background: -ms-linear-gradient(top,  #af1111 1%,#660202 100%); /* IE10+ */
+			background: linear-gradient(to bottom,  #af1111 1%,#660202 100%); /* W3C */
+			filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='#af1111', endColorstr='#660202',GradientType=0 ); /* IE6-9 */
+			border: 0;
+			border-radius: 5px;
+			box-shadow: #000 0 0 10px;
+			color: #ffffff;
+		}
+		
+		.navbar .brand
+		{
+			font-size: 1.75em;
+		}
+		
+		.navbar .brand, .navbar .nav > li > a
+		{
+			color: #ffffff;
+		}
     </style>
 </head>
 <body>
@@ -296,41 +393,55 @@ border: 0;
       <div class="container" style="background: #fafafa; margin: 20px auto;padding: 20px; box-shadow: 0 0 20px #808080;">
         <div class="navbar">
             <div class="navbar-inner">
-                    <a class="brand" href="#">Spark Video Project</a>
-                    <ul class="nav">
-                        <li><a href="index.html">Home</a></li>
-						<li><a href="#submitModal" data-bind="visible: LoggedIn" role="button" data-toggle="modal">Submit Video</a></li>
-                        <li><a href="#registerModal" data-bind="visible: !LoggedIn()" role="button" data-toggle="modal">Register</a></li>
-						<li><a href="#" data-bind="click: LogoutCommand, visible: LoggedIn">Log Out</a></li>
-                    </ul>
-                    <form class="navbar-form pull-right" data-bind="visible: !LoggedIn()">
-                        <input type="text" class="span2" id="username" placeholder="Username" data-bind="value: Username" />
-                        <input type="password" class="span2" id="password" placeholder="Password" data-bind="value: Password" />
-                        <button type="submit" class="btn" data-bind="click: Login">Login</button>
-                    </form>
-                </div>
-            </div> 
-			
-			<form class="form-search pull-right">
-                <div class="input-append">
-                    <input type="text" placeholder="Search" data-bind="value: SearchText" class="input-medium search-query">
-                    <button type="submit" data-bind="click: SearchCommand" class="btn">Go</button>
-                </div>
-            </form>
+                <a class="brand" href="#">Spark Video Project</a>
+                <ul class="nav">
+                    <li><a href="index.html">Home</a></li>
+					<li><a href="#submitModal" data-bind="visible: LoggedIn" role="button" data-toggle="modal">Submit Video</a></li>
+                    <li><a href="#registerModal" data-bind="visible: !LoggedIn()" role="button" data-toggle="modal">Register</a></li>
+					<li><a href="#" data-bind="click: LogoutCommand, visible: LoggedIn">Log Out</a></li>
+                </ul>
+                <form class="navbar-form pull-right" data-bind="visible: !LoggedIn()">
+                    <input type="text" class="span2" id="username" placeholder="Username" data-bind="value: Username" />
+                    <input type="password" class="span2" id="password" placeholder="Password" data-bind="value: Password" />
+                    <button type="submit" class="btn" data-bind="click: Login">Login</button>
+                </form>
+            </div>
+        </div> 
 					
             <div class="row-fluid">
                 <div class="span12">
-                    <h2>Tags</h2>
+                    <h2 class="pull-left">Tags</h2>
+			
+					<div class="pull-right">
+		                <form class="form-search">
+                            <div class="input-append">
+                                <input type="text" placeholder="Search Tags" data-bind="value: SearchText" class="input-medium search-query">
+                                <button type="submit" data-bind="click: SearchCommand" class="btn">Go</button>
+                            </div>
+                        </form>
+					</div>
 					
-					<p>TODO</p>
-
-                    <ul data-bind="foreach: Tags">
-                        <li><a data-bind="click: ShowTagCommand, text: Title"></a></li>
-                    </ul>
+					<div class="clearfix"></div>
 					
-					<!-- ko if: LoggedIn() && _.any(Suggestions()) -->
+					<p data-bind="foreach: Tags">
+						<a class="badge badge-info" data-bind="text: Tag, click: $root.ShowTagCommand"></a>
+                    </p>
 					
-                    <h2>Suggested Videos</h2>
+					<!-- ko if: LoggedIn() && (_.any(Suggestions()) || SuggestionsPageNumber() != 0) -->
+					
+                    <h2 class="pull-left">Suggested Videos</h2>
+					
+					<div class="pagination pull-right">
+						<ul>
+							<li><a href="#" data-bind="click: LoadPrevSuggestionsCommand">Prev</a></li>
+							<li><a href="#" data-bind="click: function () { LoadSuggestionsPageCommand(0); }">1</a></li>
+							<li><a href="#" data-bind="click: function () { LoadSuggestionsPageCommand(1); }">2</a></li>
+							<li><a href="#" data-bind="click: function () { LoadSuggestionsPageCommand(2); }">3</a></li>
+							<li><a href="#" data-bind="click: LoadNextSuggestionsCommand">Next</a></li>
+						</ul>
+					</div>
+					
+					<div class="clearfix"></div>
 					
                     <div data-bind="foreach: Suggestions">
 					  <div class="well">
@@ -340,20 +451,33 @@ border: 0;
 					   </div>
 					   <div style="margin-left: 10px;" class="pull-left">
                        	 <h4><a data-bind="attr: { 'href': URL }, text: Title"></a></h4>
+						 <p data-bind="foreach: Tags.split(' ')">
+							<span class="badge badge-info" data-bind="text: $data"></span>
+                         </p>
                        	 <div>
-						   <a href="#" class="btn" data-bind="click: $root.Approve">Approve</a> 
-                       	   <a href="#" class="btn" data-bind="click: $root.Reject">Reject</a>
+						   <a href="#" class="btn btn-success" data-bind="click: $root.Approve">Approve</a> 
+                       	   <a href="#" class="btn btn-danger" data-bind="click: $root.Reject">Reject</a>
 						 </div>
                        </div>
 					   <div class="clearfix"></div>
 					  </div>
                     </div>
-					
-					<div><a href="#" class="btn btn-primary" data-bind="click: LoadMoreSuggestionsCommand">More</a></div>
-					
+										
 					<!-- /ko -->
 					
-					<h2>Videos</h2>
+					<h2 class="pull-left">Videos</h2>
+					
+					<div class="pagination pull-right">
+						<ul>
+							<li><a href="#" data-bind="click: LoadPrevVideosCommand">Prev</a></li>
+							<li><a href="#" data-bind="click: function () { LoadVideosPageCommand(0); }">1</a></li>
+							<li><a href="#" data-bind="click: function () { LoadVideosPageCommand(1); }">2</a></li>
+							<li><a href="#" data-bind="click: function () { LoadVideosPageCommand(2); }">3</a></li>
+							<li><a href="#" data-bind="click: LoadNextVideosCommand">Next</a></li>
+						</ul>
+					</div>
+					
+					<div class="clearfix"></div>
 					
 					<p data-bind="visible: LoggedIn">Don't see a video you like? <a href="#submitModal" role="button" data-toggle="modal">Suggest it</a> now.</p>
 					
@@ -366,11 +490,12 @@ border: 0;
 					     <div>
                          	 <h4 style="word-wrap: normal" ><a data-bind="attr: { 'href': URL }, text: Title"></a></h4>
                          </div>
+						 <p data-bind="foreach: Tags.split(' ')">
+							<span class="badge badge-info" data-bind="text: $data"></span>
+                         </p>
 					     <div class="clearfix"></div>
 					   </div>
                     </div>
-					
-					<div><a href="#" class="btn btn-primary" data-bind="click: LoadMoreVideosCommand">More</a></div>
                 </div>
             </div>
         </div>
@@ -417,6 +542,12 @@ border: 0;
                 <label class="control-label" for="url">Link</label>
   	              <div class="controls">
   	              <input type="text" id="url" placeholder="The web address of the video" data-bind="value: URL">
+  	            </div>
+              </div>
+			  <div class="control-group">
+                <label class="control-label" for="url">Tags</label>
+  	              <div class="controls">
+  	              <input type="text" id="tags" placeholder="A list of searchable tags" data-bind="value: Tags">
   	            </div>
               </div>
             </form>
