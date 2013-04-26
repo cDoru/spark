@@ -1,4 +1,4 @@
-<!DOCTYPE HTML>
+<!DOCTYPE html>
 <html>
 <head>
     <title>Spark Video Website</title>
@@ -11,6 +11,7 @@
     <link href="bootstrap/css/bootstrap-responsive.css" rel="stylesheet">
 
     <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
+	<script src="purl.js"></script>
     <script src="parse/parse.min.js"></script>
     <script src="bootstrap/js/bootstrap.min.js"></script>
     <script src="underscore/underscore-min.js"></script>
@@ -284,6 +285,16 @@
 					self.LoadSuggestions();
 				}
             };
+			
+			self.LoadURL = function() {
+				var url = $.url(window.location).param('url');
+				
+				if (url) {
+					var vm = ko.dataFor($('#submitModal')[0]);
+					vm.URL(url);
+					$('#submitModal').modal();
+				}
+			};
 
             self.LoadVideos();
 			
@@ -349,33 +360,29 @@
             ko.applyBindings(vm, $('#errorModal')[0]);
             ko.applyBindings(new RegisterViewModel(vm), $('#registerModal')[0]);
 			ko.applyBindings(new SubmitViewModel(vm), $('#submitModal')[0]);
+			
+			vm.LoadURL();
         });
     </script>
     <style>
-      body { background: url('images/white_carbonfiber.png'); }
+        body { 
+		  background: url('images/subtle_carbon.png'); 
+	    }
 
-      h1, h2, h3 { color: #1080ff; }
+        h1, h2, h3 { color: #1080ff; }
 
-      a { color: #1080ff; }
+        a { color: #1080ff; }
 
-      a:hover { text-decoration: none; }
+        a:hover { text-decoration: none; }
 
 		.navbar-inner
 		{
+			background: url('images/white_carbonfiber.png');
 			padding: 15px;
 			font-size: 115%;
-			background: #af1111; /* Old browsers */
-			background: -moz-linear-gradient(top,  #af1111 1%, #660202 100%); /* FF3.6+ */
-			background: -webkit-gradient(linear, left top, left bottom, color-stop(1%,#af1111), color-stop(100%,#660202)); /* Chrome,Safari4+ */
-			background: -webkit-linear-gradient(top,  #af1111 1%,#660202 100%); /* Chrome10+,Safari5.1+ */
-			background: -o-linear-gradient(top,  #af1111 1%,#660202 100%); /* Opera 11.10+ */
-			background: -ms-linear-gradient(top,  #af1111 1%,#660202 100%); /* IE10+ */
-			background: linear-gradient(to bottom,  #af1111 1%,#660202 100%); /* W3C */
-			filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='#af1111', endColorstr='#660202',GradientType=0 ); /* IE6-9 */
 			border: 0;
-			border-radius: 5px;
-			box-shadow: #000 0 0 10px;
-			color: #ffffff;
+			border-radius: 0;
+			color: #000000;
 		}
 		
 		.navbar .brand
@@ -385,7 +392,7 @@
 		
 		.navbar .brand, .navbar .nav > li > a
 		{
-			color: #ffffff;
+			color: #000000;
 		}
     </style>
 </head>
@@ -394,10 +401,10 @@
       <div class="container" style="background: #fafafa; margin: 20px auto;padding: 20px; box-shadow: 0 0 20px #808080;">
         <div class="navbar">
             <div class="navbar-inner">
-                <a class="brand" href="#">Spark Video Project</a>
+                <a class="brand" href="#"><img src="images/icon.png" width="45" height="45" style="margin: -15px 0;" /> Video Tag</a>
                 <ul class="nav">
                     <li><a href="index.html">Home</a></li>
-					<li><a href="#submitModal" data-bind="visible: LoggedIn" role="button" data-toggle="modal">Submit Video</a></li>
+					<li><a href="#submitModal" data-bind="visible: LoggedIn" role="button" data-toggle="modal">Tag!</a></li>
                     <li><a href="#registerModal" data-bind="visible: !LoggedIn()" role="button" data-toggle="modal">Register</a></li>
 					<li><a href="#" data-bind="click: LogoutCommand, visible: LoggedIn">Log Out</a></li>
                 </ul>
@@ -480,10 +487,11 @@
 					
 					<div class="clearfix"></div>
 					
-					<p data-bind="visible: LoggedIn">Don't see a video you like? <a href="#submitModal" role="button" data-toggle="modal">Suggest it</a> now.</p>
+					<p data-bind="visible: LoggedIn">Don't see a video you like? <a href="#submitModal" role="button" data-toggle="modal">Tag it</a> now!</p>
+                    <p>Alternatively, drag this link onto your bookmarks bar to tag your favorite videos while browsing: <a class="badge" href="javascript:(function(){window.open('http://functorial.com/spark/?url='+escape(window.location), '_blank');})();">Tag!</a></p>
 					
 					<div data-bind="foreach: Videos">
-					  <div class="well" style="background: #f0f0f0; border-radius: 5px; box-shadow:0 0 10px #808080;">
+					  <div class="well">
                          <div class="pull-left" style="margin: 10px;">
 					      <a data-bind="attr: { 'href': URL }" target="_blank"> 
 						  <img data-bind="attr: { 'src': Thumbnail }" class="img-polaroid" width="140" height="140" /> </a>
