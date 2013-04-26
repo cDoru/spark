@@ -1,4 +1,4 @@
-<!DOCTYPE HTML>
+<!DOCTYPE html>
 <html>
 <head>
     <title>Spark Video Website</title>
@@ -401,10 +401,10 @@
       <div class="container" style="background: #fafafa; margin: 20px auto;padding: 20px; box-shadow: 0 0 20px #808080;">
         <div class="navbar">
             <div class="navbar-inner">
-                <a class="brand" href="#">Spark Video Project</a>
+                <a class="brand" href="#"><img src="images/icon.png" width="45" height="45" style="margin: -15px 0;" /> Video Tag</a>
                 <ul class="nav">
                     <li><a href="index.html">Home</a></li>
-					<li><a href="#submitModal" data-bind="visible: LoggedIn" role="button" data-toggle="modal">Submit Video</a></li>
+					<li><a href="#submitModal" data-bind="visible: LoggedIn" role="button" data-toggle="modal">Tag!</a></li>
                     <li><a href="#registerModal" data-bind="visible: !LoggedIn()" role="button" data-toggle="modal">Register</a></li>
 					<li><a href="#" data-bind="click: LogoutCommand, visible: LoggedIn">Log Out</a></li>
                 </ul>
@@ -487,7 +487,8 @@
 					
 					<div class="clearfix"></div>
 					
-					<p data-bind="visible: LoggedIn">Don't see a video you like? <a href="#submitModal" role="button" data-toggle="modal">Suggest it</a> now.</p>
+					<p data-bind="visible: LoggedIn">Don't see a video you like? <a href="#submitModal" role="button" data-toggle="modal">Tag it</a> now!</p>
+                    <p>Alternatively, drag this link onto your bookmarks bar to tag your favorite videos while browsing: <a class="badge" href="javascript:(function(){window.open('http://functorial.com/spark/?url='+escape(window.location), '_blank');})();">Tag!</a></p>
 					
 					<div data-bind="foreach: Videos">
 					  <div class="well">
